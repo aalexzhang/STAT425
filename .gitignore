@@ -208,3 +208,5 @@ __marimo__/
 
 # run output
 res*.txt
+outputs/
+analysis/

@@ -10,7 +10,18 @@ class TextEncoder(nn.Module):
         super(TextEncoder, self).__init__()
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.bert = BertModel.from_pretrained('bert-base-uncased')
+        # BERT is a frozen feature extractor, as in model_static.py. If it is trained, the
+        # reconstruction target (also produced by this encoder) lets the model collapse every
+        # embedding to one vector, and all anomaly scores become identical.
+        self.bert.requires_grad_(False)
+        self.bert.eval()
         self.linear = nn.Linear(768, output_dim)
+
+    def train(self, mode=True):
+        # keep BERT in eval mode (no dropout) when the detector switches to training
+        super().train(mode)
+        self.bert.eval()
+        return self
         
     def forward(self, texts):
         if isinstance(texts, (int, float)):
@@ -24,7 +35,8 @@ class TextEncoder(nn.Module):
         input_ids = encoded['input_ids'].to(next(self.bert.parameters()).device)
         attention_mask = encoded['attention_mask'].to(next(self.bert.parameters()).device)
         
-        outputs = self.bert(input_ids, attention_mask=attention_mask)
+        with torch.no_grad():
+            outputs = self.bert(input_ids, attention_mask=attention_mask)
         pooled_output = outputs.pooler_output
         
         return self.linear(pooled_output)
