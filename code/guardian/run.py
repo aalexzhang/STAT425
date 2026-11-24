@@ -7,7 +7,7 @@ Examples:
     python run.py --task mmlu --attack agent --detector static    # GUARDIAN.s
     python run.py --task math --n-samples 2                       # quick test
     python run.py --task math --attack agent --attack-agents 0,2 --prune threshold   # 2 attackers, dynamic pruning
-    python run.py --task math --attack agent --agents 6 --attack-agents random:2      # 2 attackers at random positions
+    python run.py --task math --attack agent --agents 6 --attack-agents random:2      # 2 attackers, positions drawn per question
 
 Output goes to res.txt (or --output PATH).
 
@@ -38,12 +38,16 @@ def parse_schedule(text):
     return schedule
 
 
-def parse_attack_agents(text, n_agents):
-    # "0,2" -> [0, 2]; "random:2" -> 2 distinct positions picked with a fixed seed (same for the whole run)
+def parse_attack_agents(text, n_agents, question_idx=0):
+    # "0,2" -> [0, 2] for every question.
+    # "random:2" -> 2 distinct positions drawn per question. The generator is seeded only by the
+    # question index, so a question gets the same attackers in every run with the same --agents
+    # and K (e.g. no pruning vs top1 vs threshold), which keeps runs paired question by question.
     if text.startswith("random:"):
         k = int(text.split(":")[1])
         assert 0 < k <= n_agents, f"--attack-agents random:{k} needs 1..{n_agents} attackers"
-        return sorted(random.Random(SEED).sample(range(n_agents), k))
+        rng = random.Random(f"attack-agents-{SEED}-{question_idx}")  # str seeds are stable across processes
+        return sorted(rng.sample(range(n_agents), k))
     positions = sorted({int(p) for p in text.split(",")})
     assert all(0 <= p < n_agents for p in positions), f"--attack-agents {text}: positions must be 0..{n_agents - 1}"
     return positions
@@ -96,7 +100,8 @@ def main():
     parser.add_argument("--n-samples", type=int, default=100, help="use only the first N of the 100 sampled questions")
     parser.add_argument("--math-levels", default="all", help='comma-separated MATH levels, or "all"')
     parser.add_argument("--attack-agents", default="0",
-                        help='--attack agent: comma-separated agent positions, or "random:K" for K random positions')
+                        help='--attack agent: comma-separated agent positions, or "random:K" for K random positions '
+                             'drawn per question (same positions for a question across runs with the same --agents)')
     parser.add_argument("--prune", choices=PRUNE_MODES, default="top1",
                         help="top1 = remove the highest-scoring agent each round (paper); "
                              "threshold = remove every agent above mean + k*std of that round's scores")
@@ -117,13 +122,15 @@ def main():
 
     levels = None if args.math_levels == "all" else [int(l) for l in args.math_levels.split(",")]
     task = make_task(args.task, levels, args.data_path, args.judge_model)
-    attack = Attack(args.attack, parse_attack_agents(args.attack_agents, args.agents), parse_schedule(args.comm_schedule))
+    parse_attack_agents(args.attack_agents, args.agents)  # validate the option before any API calls
     examples = task.load(args.n_samples)
 
     correct, judged, total_api_call = 0, 0, 0
     for i, example in enumerate(examples):
         print(f"[{ts()}] Question {i + 1}/{len(examples)}")
         try:
+            attack = Attack(args.attack, parse_attack_agents(args.attack_agents, args.agents, i),
+                            parse_schedule(args.comm_schedule))
             # separate generator so wrong answers don't depend on the debate's use of `random`
             wrong_answer = task.wrong_answer(example, random.Random(SEED + i)) if attack.type != "none" else None
             res, api_call = run_llmlp(task.prompt(example), args, attack, task.qtype, wrong_answer)

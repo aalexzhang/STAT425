@@ -128,7 +128,7 @@ def construct_message(responses, question, qtype):
             # prefix_string = "Here is the question:\n" + question + "\n\nPut your answer in the form (A), (B), or (C) at the end of your response."
             return {"role": "user", "content": prefix_string}
 
-        prefix_string = "\n\nThese are the solutions to the problem from other agents: "
+        prefix_string = "Here is the question:\n" + question + "\n\nThese are the solutions to the problem from other agents: "
 
         for aid, aresponse in enumerate(responses, 1):
             response = "\n\nAgent solution " + str(aid) + ": ```{}```".format(aresponse)
@@ -167,7 +167,7 @@ def construct_message(responses, question, qtype):
             # prefix_string = "Here is the question:\n" + question + "\n\nPut your answer in the form (A), (B), or (C) at the end of your response."
             return {"role": "user", "content": prefix_string}
 
-        prefix_string = "\n\nThese are the solutions to the problem from other agents: "
+        prefix_string = "Here is the question:\n" + question + "\n\nThese are the solutions to the problem from other agents: "
 
         for aid, aresponse in enumerate(responses, 1):
             response = "\n\nAgent solution " + str(aid) + ": ```{}```".format(aresponse)

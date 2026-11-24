@@ -47,7 +47,7 @@ Output goes to `res.txt` (change it with `--output`). It's written as it goes, a
 - `--model` (default `gpt-4o-mini`)
 - `--math-levels` (default `all`)
 - `--agents` (number of agents, default 4)
-- `--attack-agents`: which agents are adversarial, default `0`. Use a list like `0,2`, or `random:K` for K random positions (fixed seed, same for the whole run).
+- `--attack-agents`: which agents are adversarial, default `0`. Use a list like `0,2`, or `random:K` for K random positions drawn per question. The draw is seeded by the question index, so each question gets the same attackers in every run with the same `--agents` and K, and runs stay paired question by question.
 - `--prune`: `top1` (default, as in the paper) or `threshold`, see below
 - `--prune-k`: k for threshold pruning (default 1.0)
 - `--min-agents`: pruning never goes below this many agents (default 2)
