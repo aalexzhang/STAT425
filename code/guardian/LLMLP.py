@@ -174,8 +174,8 @@ class LLMLP:
                 total_completion_tokens += self.nodes[node_idx].completion_tokens
                 answered.append(node_idx)
 
-                # stop early once more than 2/3 of all agents agree
-                reached, reply = self.check_consensus(answered, list(range(self.agents)))
+                # stop early once more than 2/3 of the agents still in the debate agree
+                reached, reply = self.check_consensus(answered, alive)
                 if reached:
                     return reply, resp_cnt, get_completions(), total_prompt_tokens, total_completion_tokens
             history.append({idx % self.agents: self.nodes[idx].get_answer() for idx in answered})
@@ -195,6 +195,9 @@ class LLMLP:
             print(f"[{ts()}] Round {rid + 1} anomaly scores: {score_str}{threshold_str} -> pruned {pruned}")
             for pos in pruned:
                 self.pruned.append((rid, pos, scores[alive.index(pos)]))
+                # cut the pruned agent's outgoing messages: its reply from this round (the one the
+                # detector flagged) is not shown to anyone in the next round
+                self.nodes[self.agents * rid + pos].pruned = True
             alive = [pos for pos in alive if pos not in pruned]
 
         completions = get_completions()
