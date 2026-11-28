@@ -15,6 +15,7 @@ class LLMNeuron:
         self.answer = ""
         self.active = False
         self.pruned = False  # set when this agent is pruned: its reply is kept for the log but no longer sent to others
+        self.hidden = set()  # source nodes whose replies this node may not read (message masking experiment)
         self.importance = 0
         self.to_edges = []
         self.from_edges = []
@@ -54,6 +55,7 @@ class LLMNeuron:
     def deactivate(self):
         self.active = False
         self.pruned = False
+        self.hidden = set()
         self.reply = None
         self.answer = ""
         self.question = None
@@ -114,7 +116,8 @@ class LLMNeuron:
             raise NotImplementedError("Error init question type")
         contexts = [{"role": "system", "content": sys_prompt}]
         
-        formers = [(edge.a1.reply, eid) for eid, edge in enumerate(self.from_edges) if edge.a1.reply is not None and edge.a1.active and not edge.a1.pruned]
+        formers = [(edge.a1.reply, eid) for eid, edge in enumerate(self.from_edges)
+                   if edge.a1.reply is not None and edge.a1.active and not edge.a1.pruned and edge.a1 not in self.hidden]
         return contexts, formers
         
     def get_conversation(self):
